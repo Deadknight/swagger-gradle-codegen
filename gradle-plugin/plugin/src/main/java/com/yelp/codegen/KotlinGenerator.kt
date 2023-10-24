@@ -1,18 +1,8 @@
 package com.yelp.codegen
 
 import com.google.common.annotations.VisibleForTesting
-import com.yelp.codegen.utils.KotlinLangUtils
-import com.yelp.codegen.utils.safeSuffix
-import com.yelp.codegen.utils.sanitizeKotlinSpecificNames
-import com.yelp.codegen.utils.toCamelCase
-import com.yelp.codegen.utils.toPascalCase
-import io.swagger.codegen.CodegenConstants
-import io.swagger.codegen.CodegenModel
-import io.swagger.codegen.CodegenOperation
-import io.swagger.codegen.CodegenParameter
-import io.swagger.codegen.CodegenProperty
-import io.swagger.codegen.DefaultCodegen
-import io.swagger.codegen.SupportingFile
+import com.yelp.codegen.utils.*
+import io.swagger.codegen.*
 import io.swagger.models.Model
 import io.swagger.models.Operation
 import io.swagger.models.Swagger
@@ -198,6 +188,73 @@ open class KotlinGenerator : SharedCodegen() {
 
     override fun fromModel(name: String, model: Model, allDefinitions: MutableMap<String, Model>?): CodegenModel {
         val codegenModel = super.fromModel(name, model, allDefinitions)
+        val foundRoomVariable = getRoomAnnotations().find { roomVariables ->
+            roomVariables.entityName == codegenModel.name
+        }
+        codegenModel.requiredVars.forEach {
+            if(it.datatype.contains("Any")) {
+                it.xmlPrefix = "@RawValue"
+                it.isXmlAttribute = true
+                /*if (property.type == "object"
+                        || (property is ArrayProperty && property.items != null && property.items.type == "object")) {
+                    propertyValue = "@RawValue $propertyValue"
+                }*/
+            }
+            else
+                it.xmlPrefix = ""
+
+            /*foundRoomVariable?.let { roomVariable ->
+                if(roomVariable.primaryKeys.contains(it.name))
+                    it.vendorExtensions["addNotNull"] = true
+            }*/
+        }
+        codegenModel.optionalVars.forEach {
+            if(it.datatype.contains("Any")) {
+                it.xmlPrefix = "@RawValue"
+                it.isXmlAttribute = true
+                /*if (property.type == "object"
+                        || (property is ArrayProperty && property.items != null && property.items.type == "object")) {
+                    propertyValue = "@RawValue $propertyValue"
+                }*/
+            }
+            else
+                it.xmlPrefix = ""
+
+            foundRoomVariable?.let { roomVariable ->
+                if(roomVariable.primaryKeys.contains(it.name)) {
+                    it.vendorExtensions["addNotNull"] = true
+                    it.datatype = it.datatype.removeSuffix("?")
+                    it.datatypeWithEnum = it.datatypeWithEnum.removeSuffix("?")
+                    if(it.datatype == "Long" || it.datatype == "Int")
+                        it.vendorExtensions["addNotNullPrimitive"] = true
+                }
+            }
+        }
+        foundRoomVariable?.generateKeys?.forEach {
+            val prop = CodegenProperty()
+            prop.baseName = it.name
+            prop.complexType = "Long"
+            prop.getter = "get" + it.name
+            prop.setter = "set" + it.name
+            prop.datatype = "Long"
+            prop.datatypeWithEnum = "Long"
+            prop.dataFormat = "int64"
+            prop.name = it.name
+            prop.defaultValue = "null"
+            prop.defaultValueWithParam = " = data." + it.name + ";"
+            prop.baseType = "Long"
+            prop.nameInCamelCase = it.name
+            prop.vendorExtensions = mutableMapOf()
+            prop.vendorExtensions["addNotNull"] = true
+            prop.vendorExtensions["addNotNullPrimitive"] = true
+
+            if(it.autogenerate)
+            {
+                prop.vendorExtensions["autoGeneratePrimaryKey"] = true
+            }
+
+            codegenModel.optionalVars.add(prop)
+        }
         addRequiredImports(codegenModel)
         return codegenModel
     }
@@ -227,6 +284,8 @@ open class KotlinGenerator : SharedCodegen() {
     override fun postProcessModelProperty(model: CodegenModel, property: CodegenProperty) {
         super.postProcessModelProperty(model, property)
 
+        if (property.isEnum && property.complexType != "String")
+            property.isEnum = false
         if (property.isEnum) {
             property.datatypeWithEnum = postProcessDataTypeWithEnum(model.classname, property)
         }
@@ -314,6 +373,38 @@ open class KotlinGenerator : SharedCodegen() {
             }
     }
 
+    override fun toEnumValue(value: String?, datatype: String?): String {
+        return if ("Float".equals(datatype, ignoreCase = true)
+                || "Float?".equals(datatype, ignoreCase = true)
+                || "Int?".equals(datatype, ignoreCase = true)
+                || "Int".equals(datatype, ignoreCase = true)
+                || "Long".equals(datatype, ignoreCase = true)
+                || "Long?".equals(datatype, ignoreCase = true)
+                || "Double".equals(datatype, ignoreCase = true)
+                || "Double?".equals(datatype, ignoreCase = true)
+                ) {
+            value!!
+        } else {
+            "\"" + escapeText(value) + "\""
+        }
+    }
+
+    fun toEnumValueDisplay(value: String?, datatype: String?): String {
+        return if ("Float".equals(datatype, ignoreCase = true)
+                || "Float?".equals(datatype, ignoreCase = true)
+                || "Int?".equals(datatype, ignoreCase = true)
+                || "Int".equals(datatype, ignoreCase = true)
+                || "Long".equals(datatype, ignoreCase = true)
+                || "Long?".equals(datatype, ignoreCase = true)
+                || "Double".equals(datatype, ignoreCase = true)
+                || "Double?".equals(datatype, ignoreCase = true)
+        ) {
+            value!!
+        } else {
+            "\"" + escapeText(value) + "\""
+        }
+    }
+
     override fun toVarName(name: String): String {
         return escapeReservedWord(name.toCamelCase())
     }
@@ -390,7 +481,61 @@ open class KotlinGenerator : SharedCodegen() {
         val imports = processedModels["imports"] as MutableList<Map<String, String>>
         imports.sortBy { it["import"] }
 
+        val modelArr = objs["models"] as ArrayList<*>
+        modelArr.forEach { it as HashMap<*, *>
+            if(it.containsKey("model"))
+            {
+                val codegenModel: CodegenModel = it["model"] as CodegenModel
+                val foundRoomVariable = getRoomAnnotations().find { roomVariables ->
+                    roomVariables.entityName == codegenModel.name
+                }
+                foundRoomVariable?.let { roomVariable ->
+                    codegenModel.vendorExtensions["isRoomEntity"] = true
+                    if(roomVariable.primaryKeys.isNotEmpty() || (roomVariable.tableName != null && roomVariable.tableName?.isNotBlank() == true))
+                        codegenModel.vendorExtensions["hasRoomPrimaryKeyOrTableName"] = true
+                    if(roomVariable.tableName != null && roomVariable.tableName?.isNotBlank() == true) {
+                        codegenModel.vendorExtensions["hasRoomTableName"] = true
+                        codegenModel.vendorExtensions["tableName"] = roomVariable.tableName
+                    }
+                    if(roomVariable.primaryKeys.isNotEmpty())
+                    {
+                        codegenModel.vendorExtensions["hasRoomPrimaryKey"] = true
+                        codegenModel.vendorExtensions["primaryKeys"] = roomVariable.primaryKeys
+                    }
+                    if(roomVariable.fts3)
+                    {
+                        codegenModel.vendorExtensions["hasRoomFts3"] = true
+                    }
+                    if(roomVariable.fts4)
+                    {
+                        codegenModel.vendorExtensions.remove("hasRoomFts3")
+                        codegenModel.vendorExtensions["hasRoomFts4"] = true
+                    }
+                }
+            }
+        }
+
         return processedModels
+    }
+
+    override fun updateCodegenPropertyEnum(en: CodegenProperty?) {
+        super.updateCodegenPropertyEnum(en)
+        if(en?.allowableValues != null)
+        {
+            if(en._enum != null) {
+                val values = en.allowableValues["enumVars"] as ArrayList<*>
+                var count = 0
+                values.forEach {
+                    (it as HashMap<String, Any>).let {
+                        var data = en._enum[count].toString()
+                        if (!data.startsWith("\""))
+                            data = "\"" + data + "\""
+                        it.put("textValue", data)
+                    }
+                    count++;
+                }
+            }
+        }
     }
 
     override fun fromOperation(
@@ -403,6 +548,38 @@ open class KotlinGenerator : SharedCodegen() {
         val codegenOperation = super.fromOperation(path, httpMethod, operation, definitions, swagger)
 
         retrofitImport[codegenOperation.httpMethod]?.let { codegenOperation.imports.add(it) }
+        codegenOperation.allParams.forEach {
+            it.hasMore = true
+        }
+        codegenOperation.headerParams.forEach {
+            it.hasMore = true
+        }
+        codegenOperation.pathParams.forEach {
+            it.hasMore = true
+        }
+        codegenOperation.queryParams.forEach {
+            it.hasMore = true
+        }
+        codegenOperation.bodyParams.forEach {
+            it.hasMore = true
+        }
+        /*codegenOperation.allParams.sortWith(object : Comparator<CodegenParameter> {
+            override fun compare(p0: CodegenParameter?, p1: CodegenParameter?): Int {
+                if(p0?.isQueryParam == true)
+                    return 1
+                if(p1?.isQueryParam == true)
+                    return -1
+                return 0
+            }
+        })
+        codegenOperation.allParams.last().hasMore = false*/
+        codegenOperation.allParams.clear()
+        codegenOperation.allParams.addAll(codegenOperation.headerParams)
+        codegenOperation.allParams.addAll(codegenOperation.pathParams)
+        codegenOperation.allParams.addAll(codegenOperation.queryParams)
+        codegenOperation.allParams.addAll(codegenOperation.bodyParams)
+        if(codegenOperation.allParams.isNotEmpty())
+            codegenOperation.allParams.last().hasMore = false
         codegenOperation.allParams.forEach { codegenParameter: CodegenParameter ->
             codegenParameter.collectionFormat?.let {
                 val importName = "$toolsPackage.${it.toUpperCase()}"

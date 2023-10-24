@@ -5,6 +5,7 @@ import org.gradle.api.DefaultTask
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.plugins.BasePlugin
+import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFile
@@ -58,6 +59,10 @@ abstract class GenerateTask : DefaultTask() {
     @get:Option(option = "featureHeaderToRemove", description = "")
     var features: FeatureConfiguration? = null
 
+    @get:Nested
+    @get:Option(option = "roomVariables", description = "")
+    var roomVariables: ListProperty<String>? = null
+
     @TaskAction
     fun swaggerGenerate() {
         val platform = platform.get()
@@ -68,6 +73,11 @@ abstract class GenerateTask : DefaultTask() {
         val specVersion = specVersion.get()
 
         val headersToRemove = features?.headersToRemove?.get() ?: emptyList()
+        val roomAnnotationsIn = roomVariables?.get() ?: emptyList()
+
+        val roomAnnotations = roomAnnotationsIn.map {
+            com.fasterxml.jackson.databind.ObjectMapper().readValue(it, RoomVariables::class.java)
+        }
 
         println(
             """
@@ -83,6 +93,7 @@ abstract class GenerateTask : DefaultTask() {
             groupId ${'\t'} $packageName
             artifactId ${'\t'} $packageName
             features ${'\t'} ${headersToRemove.joinToString(separator = ",", prefix = "[", postfix = "]")}
+            roomAnnotations ${'\t'} ${roomAnnotations.joinToString { it.entityName }}
             """.trimIndent()
         )
 
@@ -108,7 +119,10 @@ abstract class GenerateTask : DefaultTask() {
         }
 
         // Running the Codegen Main here
-        main(params.toTypedArray())
+        /*val rooms = roomAnnotations.map {
+            RoomVariables(it.getEntityName().get(), if(it.getTableName().get() == "") null else it.getTableName().get(), it.getPrimaryKeys().get(), it.getFts3().get(), it.getFts4().get())
+        }*/
+        main(params.toTypedArray(), roomAnnotations)
 
         // Copy over the extra files.
         val source = extraFiles.orNull?.asFile

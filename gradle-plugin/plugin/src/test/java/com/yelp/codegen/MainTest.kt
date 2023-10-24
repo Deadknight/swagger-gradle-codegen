@@ -24,7 +24,8 @@ class MainTest {
                 "-v", "0.0.1",
                 "-g", "com.yelp.codegen",
                 "-a", " generatecodesamples"
-            ).toTypedArray()
+            ).toTypedArray(),
+                listOf()
         )
     }
 

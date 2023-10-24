@@ -1,14 +1,8 @@
 package com.yelp.codegen
 
+import com.yelp.codegen.plugin.RoomVariables
 import com.yelp.codegen.utils.safeSuffix
-import io.swagger.codegen.CodegenConfig
-import io.swagger.codegen.CodegenModel
-import io.swagger.codegen.CodegenOperation
-import io.swagger.codegen.CodegenProperty
-import io.swagger.codegen.CodegenType
-import io.swagger.codegen.DefaultCodegen
-import io.swagger.codegen.InlineModelResolver
-import io.swagger.codegen.SupportingFile
+import io.swagger.codegen.*
 import io.swagger.models.ArrayModel
 import io.swagger.models.ComposedModel
 import io.swagger.models.Model
@@ -29,6 +23,7 @@ const val SERVICE_NAME = "service_name"
 const val ARTIFACT_ID = "artifact_id"
 const val GROUP_ID = "group_id"
 const val HEADERS_TO_IGNORE = "headers_to_ignore"
+const val ROOM_ANNOTATIONS = "room_annotations"
 
 // Vendor Extensions Names
 internal const val X_NULLABLE = "x-nullable"
@@ -356,6 +351,14 @@ abstract class SharedCodegen : DefaultCodegen(), CodegenConfig {
         return headerList.toList()
     }
 
+    protected fun getRoomAnnotations(): List<RoomVariables> {
+        val roomAnnotationsParam = additionalProperties[ROOM_ANNOTATIONS] as? List<RoomVariables>
+        if (roomAnnotationsParam != null) {
+            return roomAnnotationsParam
+        }
+        return listOf()
+    }
+
     /**
      * Method to remove the a header parameter from a [CodegenOperation].
      */
@@ -378,12 +381,12 @@ abstract class SharedCodegen : DefaultCodegen(), CodegenConfig {
      * For MapProperties this will generate a `Map from String to <TYPE>`
      * For other Properties this will resolve the type and evaluate the `X-Nullability`
      */
-    internal fun resolvePropertyType(
+    fun resolvePropertyType(
         property: Property,
         listTypeWrapper: (String, String) -> String = ::listTypeWrapper,
         mapTypeWrapper: (String, String) -> String = ::mapTypeWrapper
     ): String {
-        return when (property) {
+        var propertyValue = when (property) {
             is ArrayProperty -> {
                 // Will generate a type like List<INNERTYPE>
                 listTypeWrapper(getSwaggerType(property), resolvePropertyType(property.items))
@@ -397,13 +400,14 @@ abstract class SharedCodegen : DefaultCodegen(), CodegenConfig {
             // Here we want to evaluate the X-Nullability and eventually annotate the type.
             else -> {
                 val baseType = super.getTypeDeclaration(property)
-                return if (property.isXNullable()) {
+                if (property.isXNullable()) {
                     baseType.safeSuffix("?")
                 } else {
                     baseType
                 }
             }
         }
+        return propertyValue
     }
 
     /**

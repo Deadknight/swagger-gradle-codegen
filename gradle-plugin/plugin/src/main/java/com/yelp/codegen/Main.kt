@@ -3,6 +3,7 @@
 package com.yelp.codegen
 
 import com.fasterxml.jackson.core.PrettyPrinter
+import com.yelp.codegen.plugin.RoomVariables
 import io.swagger.codegen.DefaultGenerator
 import io.swagger.codegen.config.CodegenConfigurator
 import io.swagger.parser.SwaggerParser
@@ -14,7 +15,7 @@ import org.apache.commons.cli.Option
 import org.apache.commons.cli.Options
 import java.io.File
 
-fun main(args: Array<String>) {
+fun main(args: Array<String>, roomAnnotations: List<RoomVariables>) {
     val options = Options()
     options.addRequiredOption(
         "p",
@@ -82,6 +83,7 @@ fun main(args: Array<String>) {
     configurator.addAdditionalProperty(GROUP_ID, parsed['g'])
     configurator.addAdditionalProperty(ARTIFACT_ID, parsed['a'])
     configurator.addAdditionalProperty(HEADERS_TO_IGNORE, parsed["ignoreheaders"])
+    configurator.addAdditionalProperty(ROOM_ANNOTATIONS, roomAnnotations)
 
     DefaultGenerator().opts(configurator.toClientOptInput()).generate()
     copySpec(checkNotNull(configurator.inputSpec), checkNotNull(configurator.outputDir))

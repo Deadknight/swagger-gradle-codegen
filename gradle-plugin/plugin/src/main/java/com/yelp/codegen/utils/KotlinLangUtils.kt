@@ -5,6 +5,8 @@ import io.swagger.codegen.DefaultCodegen
 object KotlinLangUtils {
 
     internal val kotlinLanguageSpecificPrimitives = setOf(
+        "kotlin.Any",
+        "kotlin.Any?",
         "kotlin.Byte",
         "kotlin.Short",
         "kotlin.Int",
@@ -90,6 +92,8 @@ object KotlinLangUtils {
     )
 
     internal val kotlinDefaultIncludes = setOf(
+        "kotlin.Any",
+        "kotl.n.Any?",
         "kotlin.Byte",
         "kotlin.Short",
         "kotlin.Int",
@@ -120,7 +124,8 @@ object KotlinLangUtils {
         "array" to "List",
         "list" to "List",
         "map" to "Map",
-        "object" to "Map<String, Any?>",
+
+        "object" to "Any?",
         "binary" to "List<Byte>"
     )
 
@@ -131,6 +136,8 @@ object KotlinLangUtils {
     )
 
     internal val kotlinImportMapping = mapOf(
+        "Any" to "kotlin.Any",
+        "Any?" to "kotlin.Any",
         "Boolean" to "kotlin.Boolean",
         "String" to "kotlin.String",
         "Int" to "kotlin.Int",

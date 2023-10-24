@@ -22,6 +22,7 @@ class CodegenPlugin : Plugin<Project> {
 
             it.extraFiles.set(config.extraFiles)
             it.features = config.features
+            it.roomVariables = config.roomVariables
         }
     }
 }

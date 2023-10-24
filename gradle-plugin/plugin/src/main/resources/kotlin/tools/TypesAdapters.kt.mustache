@@ -22,7 +22,8 @@ class TypesAdapterFactory : JsonAdapter.Factory {
     private val types = mapOf<Type, JsonAdapter<*>>(
         LocalDate::class.java to LocalDateAdapter(),
         ZonedDateTime::class.java to ZonedDateTimeAdapter(),
-        BigDecimal::class.java to BigDecimalJsonAdapter()
+        BigDecimal::class.java to BigDecimalJsonAdapter(),
+        Any::class.java to AnyJsonAdapter()
     )
 
     override fun create(type: Type, annotations: MutableSet<out Annotation>, moshi: Moshi): JsonAdapter<*>? {
@@ -56,16 +57,21 @@ internal abstract class XNullableJsonAdapter<T> : JsonAdapter<T>() {
 
 internal class LocalDateAdapter : XNullableJsonAdapter<LocalDate>() {
     private val formatter = DateTimeFormatter.ISO_LOCAL_DATE
+    private val toFormatter = DateTimeFormatter.ISO_INSTANT
 
     override fun fromNonNullString(nextString: String): LocalDate = LocalDate.parse(nextString, formatter)
 
     override fun toJson(writer: JsonWriter, value: LocalDate?) {
-        value?.let { writer.value(it.format(formatter)) }
+        if(value == null)
+            writer.nullValue()
+        else
+            writer.value(value.format(toFormatter))
     }
 }
 
 internal class ZonedDateTimeAdapter : XNullableJsonAdapter<ZonedDateTime>() {
     private val formatter = DateTimeFormatter.ISO_DATE_TIME
+    private val toFormatter = DateTimeFormatter.ISO_INSTANT
 
     override fun fromNonNullString(nextString: String): ZonedDateTime {
         return try {
@@ -77,7 +83,10 @@ internal class ZonedDateTimeAdapter : XNullableJsonAdapter<ZonedDateTime>() {
     }
 
     override fun toJson(writer: JsonWriter, value: ZonedDateTime?) {
-        value?.let { writer.value(it.format(formatter)) }
+        if(value == null)
+            writer.nullValue()
+        else
+            writer.value(value.format(toFormatter))
     }
 }
 
@@ -85,6 +94,19 @@ internal class BigDecimalJsonAdapter : XNullableJsonAdapter<BigDecimal>() {
     override fun fromNonNullString(nextString: String) = BigDecimal(nextString)
 
     override fun toJson(writer: JsonWriter, value: BigDecimal?) {
-        value?.let { writer.value(it) }
+        if(value == null)
+            writer.nullValue()
+        else
+            writer.value(value)
+    }
+}
+
+internal class AnyJsonAdapter: JsonAdapter<Any>() {
+    override fun fromJson(reader: JsonReader): Any? {
+        return reader.readJsonValue()
+    }
+
+    override fun toJson(writer: JsonWriter, value: Any?) {
+        writer.value(value.toString())
     }
 }

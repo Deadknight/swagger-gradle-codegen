@@ -23,4 +23,6 @@ abstract class GenerateTaskConfiguration @Inject constructor(project: Project) {
     val features: FeatureConfiguration = FeatureConfiguration(objects)
 
     fun features(action: Action<FeatureConfiguration>) = action.execute(features)
+
+    val roomVariables = objects.listProperty(String::class.java).convention(listOf())
 }
